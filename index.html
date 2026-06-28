@@ -16,8 +16,22 @@
       --border:  #252b3b;
       --text:    #f0f2f8;
       --muted:   #8892a4;
+      --header-start: #111624;
+      --logo-wrap-bg: rgba(255, 255, 255, 0.04);
+      --logo-wrap-border: rgba(255, 255, 255, 0.08);
       --badge-live:   #16a34a;
       --badge-coming: #44505f;
+    }
+
+    [data-theme='light'] {
+      --bg:      #f3f6fb;
+      --surface: #ffffff;
+      --border:  #d2dced;
+      --text:    #13233f;
+      --muted:   #4d5f7c;
+      --header-start: #e8eef8;
+      --logo-wrap-bg: rgba(19, 35, 63, 0.04);
+      --logo-wrap-border: rgba(19, 35, 63, 0.14);
     }
 
     body {
@@ -31,10 +45,32 @@
 
     /* ── Header ───────────────────────────────────────────── */
     header {
+      position: relative;
       padding: 2.5rem 2rem 2rem;
       text-align: center;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, #111624 0%, var(--bg) 100%);
+      background: linear-gradient(180deg, var(--header-start) 0%, var(--bg) 100%);
+    }
+
+    .theme-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      line-height: 1;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .theme-toggle:hover {
+      transform: translateY(-1px);
+      border-color: var(--blue);
     }
 
     .logo-row {
@@ -48,8 +84,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--logo-wrap-bg);
+      border: 1px solid var(--logo-wrap-border);
       border-radius: 14px;
       padding: 0.5rem 0.85rem;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
@@ -185,6 +221,12 @@
     .badge.live   { background: rgba(22,163,74,0.15);  color: #4ade80; border: 1px solid rgba(22,163,74,0.35); }
     .badge.coming { background: rgba(68,80,95,0.25);    color: var(--muted); border: 1px solid var(--border); }
 
+    [data-theme='light'] .badge.live {
+      color: #166534;
+      background: rgba(22, 163, 74, 0.14);
+      border: 1px solid rgba(22, 163, 74, 0.3);
+    }
+
     /* Card body */
     .card-body { flex: 1; }
 
@@ -241,6 +283,7 @@
 <body>
 
   <header>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark mode">Light Mode</button>
     <div class="logo-row">
       <div class="logo-wrap">
         <img id="psi-logo" class="logo-image" src="assets/psi-logo.png" alt="Project Services International logo" />
@@ -261,6 +304,29 @@
   </footer>
 
   <script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const storedTheme = localStorage.getItem('theme');
+    const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const activeTheme = storedTheme || preferredTheme;
+
+    const applyTheme = theme => {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        themeToggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
+      }
+    };
+
+    applyTheme(activeTheme);
+
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      });
+    }
+
     const logo = document.getElementById('psi-logo');
     const logoFallback = document.getElementById('psi-logo-fallback');
     if (logo) {

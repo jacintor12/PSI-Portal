@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSI Workflow Portal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #1a56db;
+      --blue-dk: #1040b0;
+      --red:     #e02424;
+      --bg:      #0f1117;
+      --surface: #181c27;
+      --border:  #252b3b;
+      --text:    #f0f2f8;
+      --muted:   #8892a4;
+      --badge-live:   #16a34a;
+      --badge-coming: #44505f;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      padding: 2.5rem 2rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #111624 0%, var(--bg) 100%);
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--blue) 0%, var(--red) 100%);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header h1 span.psi  { color: var(--blue); }
+    header h1 span.dash { color: var(--muted); font-weight: 300; margin: 0 0.35rem; }
+    header h1 span.sub  { color: var(--red); }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.4rem;
+    }
+
+    /* ── Grid ─────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      padding: 2.5rem 2rem 3rem;
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      padding-left: 2px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* ── Card ─────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.6rem 1.5rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent 60%, rgba(26,86,219,0.06) 100%);
+      pointer-events: none;
+    }
+
+    .card.live {
+      cursor: pointer;
+    }
+
+    .card.live:hover {
+      transform: translateY(-4px);
+      border-color: var(--blue);
+      box-shadow: 0 8px 32px rgba(26, 86, 219, 0.18);
+    }
+
+    .card.live:hover .card-arrow {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .card.coming {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    /* Card header row */
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .card-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.55rem;
+      border-radius: 99px;
+      flex-shrink: 0;
+    }
+
+    .badge.live   { background: rgba(22,163,74,0.15);  color: #4ade80; border: 1px solid rgba(22,163,74,0.35); }
+    .badge.coming { background: rgba(68,80,95,0.25);    color: var(--muted); border: 1px solid var(--border); }
+
+    /* Card body */
+    .card-body { flex: 1; }
+
+    .card-body h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.35;
+      margin-bottom: 0.4rem;
+    }
+
+    .card-body p {
+      font-size: 0.83rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* Arrow */
+    .card-arrow {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+      color: var(--blue);
+      font-weight: 500;
+      opacity: 0;
+      transform: translateX(-6px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .card-arrow svg { flex-shrink: 0; }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* ── Icon color helpers ───────────────────────────────── */
+    .icon-blue   { background: rgba(26,86,219,0.15); }
+    .icon-red    { background: rgba(224,36,36,0.15); }
+    .icon-green  { background: rgba(22,163,74,0.15); }
+    .icon-violet { background: rgba(124,58,237,0.15); }
+
+    @media (max-width: 480px) {
+      header { padding: 2rem 1.25rem 1.5rem; }
+      main   { padding: 2rem 1.25rem 2.5rem; }
+      .grid  { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-row">
+      <div class="logo-icon">🏢</div>
+      <h1><span class="psi">Project Services International</span></h1>
+    </div>
+    <p>Internal Workflow Tools &nbsp;·&nbsp; Select an application to launch</p>
+  </header>
+
+  <main>
+    <p class="section-label">Proposal Preparation Workflow</p>
+    <div class="grid" id="app-grid"></div>
+  </main>
+
+  <footer>
+    Project Services International &nbsp;·&nbsp; Workflow Portal
+  </footer>
+
+  <script>
+    const apps = [
+      {
+        id: 'sam',
+        icon: '🔍',
+        iconClass: 'icon-blue',
+        title: 'SAM Opportunities Searcher',
+        desc: 'Search and discover active government contracting opportunities on SAM.gov filtered for PSI's capabilities.',
+        url: 'https://psiagent.onrender.com/',
+        live: true,
+      },
+      {
+        id: 'rfq',
+        icon: '📋',
+        iconClass: 'icon-red',
+        title: 'RFQ Analyst',
+        desc: 'Upload an RFQ/RFP document to extract the executive summary, BOM, compliance requirements, and proposal checklist.',
+        url: 'https://psi-workflow.onrender.com/',
+        live: true,
+      },
+      {
+        id: 'preparer',
+        icon: '✍️',
+        iconClass: 'icon-green',
+        title: 'Technical Proposal Preparer',
+        desc: 'Drafts compliant technical proposal sections based on RFQ requirements and past performance data.',
+        url: null,
+        live: false,
+      },
+      {
+        id: 'inspector',
+        icon: '🔎',
+        iconClass: 'icon-violet',
+        title: 'Technical Proposal Inspector',
+        desc: 'Reviews a completed technical proposal against solicitation requirements and flags compliance gaps.',
+        url: null,
+        live: false,
+      },
+    ];
+
+    const grid = document.getElementById('app-grid');
+
+    apps.forEach(app => {
+      const card = document.createElement('div');
+      card.className = `card ${app.live ? 'live' : 'coming'}`;
+      card.setAttribute('role', app.live ? 'button' : 'article');
+      if (app.live) {
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', `Open ${app.title}`);
+      }
+
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-icon ${app.iconClass}">${app.icon}</div>
+          <span class="badge ${app.live ? 'live' : 'coming'}">${app.live ? '● Live' : 'Coming Soon'}</span>
+        </div>
+        <div class="card-body">
+          <h2>${app.title}</h2>
+          <p>${app.desc}</p>
+        </div>
+        ${app.live ? `
+        <div class="card-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          Open app
+        </div>` : ''}
+      `;
+
+      if (app.live) {
+        const open = () => window.open(app.url, '_blank', 'noopener,noreferrer');
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(); });
+      }
+
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>

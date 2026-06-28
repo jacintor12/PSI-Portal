@@ -41,15 +41,35 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.85rem;
     }
 
-    .logo-icon {
-      width: 42px; height: 42px;
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 0.5rem 0.85rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .logo-image {
+      width: clamp(220px, 38vw, 420px);
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    .logo-fallback {
+      display: none;
+      width: 42px;
+      height: 42px;
       background: linear-gradient(135deg, var(--blue) 0%, var(--red) 100%);
       border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
+      align-items: center;
+      justify-content: center;
       font-size: 1.4rem;
       flex-shrink: 0;
     }
@@ -222,9 +242,12 @@
 
   <header>
     <div class="logo-row">
-      <div class="logo-icon">🏢</div>
-      <h1><span class="psi">Project Services International</span></h1>
+      <div class="logo-wrap">
+        <img id="psi-logo" class="logo-image" src="assets/psi-logo.png" alt="Project Services International logo" />
+        <div id="psi-logo-fallback" class="logo-fallback">🏢</div>
+      </div>
     </div>
+    <h1><span class="psi">Project Services International</span></h1>
     <p>Proposal Preparation Workflow &nbsp;·&nbsp; Select an application to launch</p>
   </header>
 
@@ -238,6 +261,17 @@
   </footer>
 
   <script>
+    const logo = document.getElementById('psi-logo');
+    const logoFallback = document.getElementById('psi-logo-fallback');
+    if (logo) {
+      logo.addEventListener('error', () => {
+        logo.style.display = 'none';
+        if (logoFallback) {
+          logoFallback.style.display = 'inline-flex';
+        }
+      });
+    }
+
     const apps = [
       {
         id: 'sam',

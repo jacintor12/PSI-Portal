@@ -777,6 +777,7 @@
                     <th>Vendor</th>
                     <th>Estimated Price</th>
                     <th>Sourcing Link</th>
+                    <th>Manual Search</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -799,6 +800,9 @@
               ? `<a href="${res.url}" target="_blank" rel="noopener noreferrer">View Direct Link ↗</a>`
               : '<span style="color: var(--muted); font-style: italic;">No Direct Link</span>';
 
+            const googleSearchQuery = `${desc} ${partNo}`.trim();
+            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(googleSearchQuery)}`;
+
             html += `
               <tr>
                 <td style="font-weight: bold; color: var(--blue);">${itemNo}</td>
@@ -808,6 +812,11 @@
                 <td>🏢 <strong>${vendor}</strong></td>
                 <td style="font-weight: 600; color: ${res.price ? 'var(--badge-live)' : 'inherit'};">${priceStr}</td>
                 <td>${urlLink}</td>
+                <td>
+                  <a href="${googleSearchUrl}" target="_blank" rel="noopener noreferrer" style="font-size: 0.85rem; text-decoration: underline; color: var(--blue); font-weight: 600; white-space: nowrap;">
+                    🔍 Google Search
+                  </a>
+                </td>
               </tr>
             `;
           });

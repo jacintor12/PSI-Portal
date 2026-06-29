@@ -730,7 +730,32 @@
           return response.json();
         })
         .then(data => {
-          if (!data.success || !data.results || data.results.length === 0) {
+          if (!data.success) {
+            throw new Error(data.error || 'Server error');
+          }
+
+          // Case A: General chat response (Markdown/Text)
+          if (data.type === 'text') {
+            // Convert simple markdown elements and links to HTML for clickability
+            let cleanedText = data.results
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+              .replace(/`([^`]+)`/g, '<code>$1</code>')
+              .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
+
+            resultsContainer.innerHTML = `
+              <div style="padding: 1rem; line-height: 1.6; white-space: pre-wrap; font-size: 0.95rem; text-align: left;">
+                ${cleanedText}
+              </div>
+            `;
+            return;
+          }
+
+          // Case B: Sourcing results table
+          if (!data.results || data.results.length === 0) {
             resultsContainer.innerHTML = `
               <div style="padding: 2.5rem; text-align: center; color: var(--red);">
                 No pricing results returned. Please verify your items text format or API key.

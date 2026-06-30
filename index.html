@@ -838,7 +838,7 @@
       });
     }
 
-    // Export Chat History
+    // Export Chat History to PDF format using native printing
     if (exportChatBtn) {
       exportChatBtn.addEventListener('click', () => {
         if (chatHistory.length === 0) {
@@ -846,24 +846,152 @@
           return;
         }
 
-        let exportText = "# PSI AI Assistant - Conversation Log\n";
-        exportText += `Exported on: ${new Date().toLocaleString()}\n\n---\n\n`;
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          alert('Popup blocked. Please allow popups for this page to print chat logs.');
+          return;
+        }
+
+        let content = `
+          <html>
+          <head>
+            <title>PSI AI Assistant - Conversation Log</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                padding: 2.5rem;
+                color: #1f2937;
+                line-height: 1.6;
+              }
+              h1 {
+                font-size: 1.6rem;
+                border-bottom: 2px solid #e5e7eb;
+                padding-bottom: 0.5rem;
+                color: #1a56db;
+                margin-top: 0;
+              }
+              .meta {
+                font-size: 0.8rem;
+                color: #6b7280;
+                margin-bottom: 2.5rem;
+              }
+              .message {
+                margin-bottom: 1.8rem;
+                padding-bottom: 1rem;
+                border-bottom: 1px solid #f3f4f6;
+                page-break-inside: avoid;
+              }
+              .role {
+                font-weight: 700;
+                font-size: 0.95rem;
+                margin-bottom: 0.35rem;
+              }
+              .role-user { color: #1a56db; }
+              .role-assistant { color: #16a34a; }
+              code {
+                font-family: monospace;
+                background: #f3f4f6;
+                padding: 0.15rem 0.3rem;
+                border-radius: 4px;
+              }
+              a {
+                color: #1a56db;
+                text-decoration: underline;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>PSI AI Assistant - Conversation Log</h1>
+            <div class="meta">Exported on: ${new Date().toLocaleString()}</div>
+        `;
+
+        function convertMarkdownToHtmlForPrint(text) {
+          let html = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+          html = html
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
+
+          const lines = html.split('\n');
+          let output = [];
+          let inTable = false;
+          let tableRows = [];
+
+          lines.forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('|')) {
+              inTable = true;
+              const cells = line.split('|').map(c => c.trim()).filter((c, i, a) => i > 0 && i < a.length - 1);
+              
+              if (cells.every(c => /^:-*-*:*$/.test(c) || c.startsWith('---') || c === '')) {
+                return;
+              }
+              
+              tableRows.push(cells);
+            } else {
+              if (inTable && tableRows.length > 0) {
+                let tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">';
+                tableHtml += '<thead><tr>' + tableRows[0].map(c => `<th style="border: 1px solid #e5e7eb; padding: 0.6rem 0.8rem; background: #f9fafb; font-weight: 600; text-align: left; font-size: 0.85rem;">${c}</th>`).join('') + '</tr></thead>';
+                tableHtml += '<tbody>';
+                for (let i = 1; i < tableRows.length; i++) {
+                  tableHtml += '<tr>' + tableRows[i].map(c => `<td style="border: 1px solid #e5e7eb; padding: 0.6rem 0.8rem; font-size: 0.85rem;">${c}</td>`).join('') + '</tr>';
+                }
+                tableHtml += '</tbody></table>';
+                output.push(tableHtml);
+                tableRows = [];
+                inTable = false;
+              }
+              output.push(line);
+            }
+          });
+
+          if (inTable && tableRows.length > 0) {
+            let tableHtml = '<table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">';
+            tableHtml += '<thead><tr>' + tableRows[0].map(c => `<th style="border: 1px solid #e5e7eb; padding: 0.6rem 0.8rem; background: #f9fafb; font-weight: 600; text-align: left; font-size: 0.85rem;">${c}</th>`).join('') + '</tr></thead>';
+            tableHtml += '<tbody>';
+            for (let i = 1; i < tableRows.length; i++) {
+              tableHtml += '<tr>' + tableRows[i].map(c => `<td style="border: 1px solid #e5e7eb; padding: 0.6rem 0.8rem; font-size: 0.85rem;">${c}</td>`).join('') + '</tr>';
+            }
+            tableHtml += '</tbody></table>';
+            output.push(tableHtml);
+          }
+
+          return output.join('\n');
+        }
 
         chatHistory.forEach(msg => {
           const isUser = msg.role === 'user';
           const sender = isUser ? '🧑 You' : '🤖 Assistant';
-          exportText += `### ${sender}\n${msg.parts[0].text}\n\n`;
+          const roleClass = isUser ? 'role-user' : 'role-assistant';
+          const htmlText = convertMarkdownToHtmlForPrint(msg.parts[0].text);
+
+          content += `
+            <div class="message">
+              <div class="role ${roleClass}">${sender}</div>
+              <div style="white-space: pre-wrap;">${htmlText}</div>
+            </div>
+          `;
         });
 
-        const blob = new Blob([exportText], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `psi_chat_log_${Date.now()}.md`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        content += `
+          </body>
+          </html>
+        `;
+
+        printWindow.document.write(content);
+        printWindow.document.close();
+
+        // Delay printing slightly to let document render fully
+        setTimeout(() => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        }, 300);
       });
     }
 

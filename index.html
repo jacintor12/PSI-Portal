@@ -278,19 +278,8 @@
       main   { padding: 2rem 1.25rem 2.5rem; }
       .grid  { grid-template-columns: 1fr; }
     }
-    /* ── Collapsible Container ── */
-    .collapsible-container {
-      transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out, margin-bottom 0.4s ease-in-out;
-      overflow: hidden;
-      max-height: 1000px;
-      opacity: 1;
-      margin-bottom: 1.5rem;
-    }
-    .collapsible-container.collapsed {
-      max-height: 0;
-      opacity: 0;
-      margin-bottom: 0 !important;
-      pointer-events: none;
+    #app-grid .card:not(.chat-container).collapsed {
+      display: none !important;
     }
 
     /* ── Chat Widget ── */
@@ -492,6 +481,11 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    @media (min-width: 768px) {
+      .chat-container {
+        grid-column: span 2;
+      }
+    }
   </style>
 </head>
 <body>
@@ -514,33 +508,31 @@
       <button id="toggle-cards-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.4rem 0.85rem;">🖥️ Minimize Agent Cards</button>
     </div>
     
-    <div id="cards-collapsible" class="collapsible-container">
-      <div class="grid" id="app-grid"></div>
-    </div>
-
-    <!-- Google AI Search Panel -->
-    <div class="chat-container">
-      <div class="chat-header">
-        <div class="chat-header-title">
-          <span>🤖</span> Google AI Search
+    <div class="grid" id="app-grid">
+      <!-- Chat widget template (will be moved to the end of the grid dynamically) -->
+      <div class="card chat-container" id="chat-widget">
+        <div class="chat-header">
+          <div class="chat-header-title">
+            <span>🤖</span> Google AI Search
+          </div>
+          <div class="api-key-container">
+            <label for="portal-api-key" style="font-weight: 600; color: var(--muted);">Gemini API Key:</label>
+            <input type="password" id="portal-api-key" class="api-key-input" placeholder="Enter API Key to enable search..." />
+          </div>
         </div>
-        <div class="api-key-container">
-          <label for="portal-api-key" style="font-weight: 600; color: var(--muted);">Gemini API Key:</label>
-          <input type="password" id="portal-api-key" class="api-key-input" placeholder="Enter API Key to enable search..." />
-        </div>
-      </div>
 
-      <div class="chat-body" id="results-container">
-        <div style="padding: 2.5rem; text-align: center; color: var(--muted); font-size: 0.95rem;">
-          Paste a single SOW item or a multi-line list of items below and click Search to look up commercial vendor links and prices.
+        <div class="chat-body" id="results-container">
+          <div style="padding: 2.5rem; text-align: center; color: var(--muted); font-size: 0.95rem;">
+            Ask a general procurement or technical question to get started...
+          </div>
         </div>
-      </div>
 
-      <div class="chat-input-area">
-        <textarea id="text-input" class="chat-textarea" placeholder="Paste your SOW item descriptions here (e.g. &#10;1. 15-Sheet Cross-Cut Shredder&#10;2. Antivirus License for 10 Devices)"></textarea>
-        <div class="chat-btn-row">
-          <div style="font-size: 0.75rem; color: var(--muted);">Powered by Gemini & Google Search Grounding</div>
-          <button id="search-btn" class="btn-primary" type="button">🔎 Search Sourcing</button>
+        <div class="chat-input-area">
+          <textarea id="text-input" class="chat-textarea" placeholder="Ask a general procurement or technical question..."></textarea>
+          <div class="chat-btn-row">
+            <div style="font-size: 0.75rem; color: var(--muted);">Powered by Gemini & Google Search Grounding</div>
+            <button id="search-btn" class="btn-primary" type="button">💬 Ask Assistant</button>
+          </div>
         </div>
       </div>
     </div>
@@ -664,13 +656,22 @@
       grid.appendChild(card);
     });
 
+    // Move chat widget inside the grid container so it renders at the end next to BOM Price Searcher
+    const chatWidget = document.getElementById('chat-widget');
+    if (chatWidget) {
+      grid.appendChild(chatWidget);
+    }
+
     // ── Collapsible Agent Cards Grid ───────────────────────────
     const toggleCardsBtn = document.getElementById('toggle-cards-btn');
-    const cardsCollapsible = document.getElementById('cards-collapsible');
-    
-    if (toggleCardsBtn && cardsCollapsible) {
+    if (toggleCardsBtn) {
       toggleCardsBtn.addEventListener('click', () => {
-        const isCollapsed = cardsCollapsible.classList.toggle('collapsed');
+        // Toggle the class 'collapsed' on all agent cards except the chat container
+        const cards = document.querySelectorAll('#app-grid .card:not(.chat-container)');
+        let isCollapsed = false;
+        cards.forEach(card => {
+          isCollapsed = card.classList.toggle('collapsed');
+        });
         toggleCardsBtn.innerHTML = isCollapsed 
           ? '🖥️ Maximize Agent Cards' 
           : '🖥️ Minimize Agent Cards';
@@ -691,15 +692,15 @@
     if (searchBtn && textInput && portalApiKey && resultsContainer) {
       searchBtn.addEventListener('click', () => {
         const apiKey = portalApiKey.value.trim();
-        const textList = textInput.value.trim();
+        const promptText = textInput.value.trim();
 
         if (!apiKey) {
           alert('Please enter your Gemini API Key first.');
           portalApiKey.focus();
           return;
         }
-        if (!textList) {
-          alert('Please paste a list of SOW items to search.');
+        if (!promptText) {
+          alert('Please enter a question.');
           textInput.focus();
           return;
         }
@@ -711,19 +712,18 @@
         resultsContainer.innerHTML = `
           <div class="loader-container">
             <div class="spinner"></div>
-            <p style="font-weight: 600; color: var(--blue);">Decoding specifications and checking commercial prices...</p>
-            <p style="font-size: 0.8rem; margin-top: 0.2rem;">This may take up to 20-30 seconds depending on the number of items.</p>
+            <p style="font-weight: 600; color: var(--blue);">Thinking and searching web sources...</p>
           </div>
         `;
 
-        // POST request to the backend of the BOM Price Searcher App
-        fetch('https://psi-workflow-prices.onrender.com/api/portal-search', {
+        // POST request to the backend conversational chat endpoint
+        fetch('https://psi-workflow-prices.onrender.com/api/portal-chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            text_list: textList,
+            prompt: promptText,
             api_key: apiKey,
             model: 'gemini-2.5-flash'
           })
@@ -743,100 +743,21 @@
             throw new Error(data.error || 'Server error');
           }
 
-          // Case A: General chat response (Markdown/Text)
-          if (data.type === 'text') {
-            // Convert simple markdown elements and links to HTML for clickability
-            let cleanedText = data.results
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-              .replace(/\*(.*?)\*/g, '<em>$1</em>')
-              .replace(/`([^`]+)`/g, '<code>$1</code>')
-              .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
+          // Convert simple markdown elements and links to HTML for clickability
+          let cleanedText = data.answer
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
 
-            resultsContainer.innerHTML = `
-              <div style="padding: 1rem; line-height: 1.6; white-space: pre-wrap; font-size: 0.95rem; text-align: left;">
-                ${cleanedText}
-              </div>
-            `;
-            return;
-          }
-
-          // Case B: Sourcing results table
-          if (!data.results || data.results.length === 0) {
-            resultsContainer.innerHTML = `
-              <div style="padding: 2.5rem; text-align: center; color: var(--red);">
-                No pricing results returned. Please verify your items text format or API key.
-              </div>
-            `;
-            return;
-          }
-
-          // Build results table
-          let html = `
-            <div class="chat-table-wrapper">
-              <table class="chat-table">
-                <thead>
-                  <tr>
-                    <th style="width: 70px;">Item No</th>
-                    <th>Cleaned Description & Specs</th>
-                    <th>Identified Brand / Model</th>
-                    <th style="width: 60px;">Qty</th>
-                    <th>Vendor</th>
-                    <th>Estimated Price</th>
-                    <th>Sourcing Link</th>
-                    <th>Manual Search</th>
-                  </tr>
-                </thead>
-                <tbody>
-          `;
-
-          data.results.forEach(res => {
-            const itemNo = res.item_no || '-';
-            const desc = res.description || 'No specs';
-            const partNo = res.manufacturer_part_no || 'Unspecified';
-            const qty = res.quantity || 1;
-            const vendor = res.vendor || 'Not Found';
-            
-            // Format price
-            let priceStr = '--';
-            if (res.price !== null && res.price !== undefined) {
-              priceStr = `$${parseFloat(res.price).toFixed(2)}`;
-            }
-
-            const urlLink = res.url 
-              ? `<a href="${res.url}" target="_blank" rel="noopener noreferrer">View Direct Link ↗</a>`
-              : '<span style="color: var(--muted); font-style: italic;">No Direct Link</span>';
-
-            const googleSearchQuery = `${desc} ${partNo}`.trim();
-            const googleSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(googleSearchQuery)}`;
-
-            html += `
-              <tr>
-                <td style="font-weight: bold; color: var(--blue);">${itemNo}</td>
-                <td>${desc}</td>
-                <td style="font-style: italic; font-weight: 500;">${partNo}</td>
-                <td>${qty}</td>
-                <td>🏢 <strong>${vendor}</strong></td>
-                <td style="font-weight: 600; color: ${res.price ? 'var(--badge-live)' : 'inherit'};">${priceStr}</td>
-                <td>${urlLink}</td>
-                <td>
-                  <a href="${googleSearchUrl}" target="_blank" rel="noopener noreferrer" style="font-size: 0.85rem; text-decoration: underline; color: var(--blue); font-weight: 600; white-space: nowrap;">
-                    🔍 Google Search
-                  </a>
-                </td>
-              </tr>
-            `;
-          });
-
-          html += `
-                </tbody>
-              </table>
+          resultsContainer.innerHTML = `
+            <div style="padding: 1rem; line-height: 1.6; white-space: pre-wrap; font-size: 0.95rem; text-align: left;">
+              ${cleanedText}
             </div>
           `;
-
-          resultsContainer.innerHTML = html;
         })
         .catch(err => {
           resultsContainer.innerHTML = `

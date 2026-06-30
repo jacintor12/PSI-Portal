@@ -534,8 +534,8 @@
 
         <div class="chat-input-area">
           <textarea id="text-input" class="chat-textarea" placeholder="Ask a general procurement or technical question..."></textarea>
-          <div class="chat-btn-row">
-            <div style="font-size: 0.75rem; color: var(--muted);">Powered by Gemini & Google Search Grounding</div>
+          <div class="chat-btn-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <button id="clear-chat-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.45rem 0.9rem; border-color: var(--border);">🗑️ Clear Chat</button>
             <button id="search-btn" class="btn-primary" type="button">💬 Ask Assistant</button>
           </div>
         </div>
@@ -685,16 +685,64 @@
 
     // ── Google AI Search Widget logic ──────────────────────────
     const searchBtn = document.getElementById('search-btn');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
     const textInput = document.getElementById('text-input');
     const portalApiKey = document.getElementById('portal-api-key');
     const resultsContainer = document.getElementById('results-container');
+
+    // Conversation history state (holds up to 20 items = 10 turns)
+    let chatHistory = [];
 
     // Load stored key
     if (portalApiKey) {
       portalApiKey.value = localStorage.getItem('gemini_api_key') || '';
     }
 
+    // Render the chat conversation
+    function renderChatHistory() {
+      if (!resultsContainer) return;
+
+      if (chatHistory.length === 0) {
+        resultsContainer.innerHTML = `
+          <div style="padding: 2.5rem; text-align: center; color: var(--muted); font-size: 0.95rem;">
+            Ask a general procurement or technical question to get started...
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      chatHistory.forEach(msg => {
+        const isUser = msg.role === 'user';
+        const senderLabel = isUser ? '🧑 You' : '🤖 Assistant';
+        const senderColor = isUser ? 'var(--blue)' : 'var(--badge-live)';
+        const text = msg.parts[0].text;
+
+        // Convert simple markdown elements and links to HTML for clickability
+        let cleanedText = text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
+
+        html += `
+          <div style="margin-bottom: 1.25rem; border-bottom: ${isUser ? '1px dashed var(--border)' : 'none'}; padding-bottom: 0.75rem; text-align: left;">
+            <div style="font-weight: 700; color: ${senderColor}; margin-bottom: 0.25rem; font-size: 0.9rem;">${senderLabel}:</div>
+            <div style="line-height: 1.6; white-space: pre-wrap; font-size: 0.95rem;">${cleanedText}</div>
+          </div>
+        `;
+      });
+
+      resultsContainer.innerHTML = html;
+      // Scroll to bottom
+      resultsContainer.scrollTop = resultsContainer.scrollHeight;
+    }
+
     if (searchBtn && textInput && portalApiKey && resultsContainer) {
+      // Trigger search
       searchBtn.addEventListener('click', () => {
         const apiKey = portalApiKey.value.trim();
         const promptText = textInput.value.trim();
@@ -713,22 +761,40 @@
         // Save key
         localStorage.setItem('gemini_api_key', apiKey);
 
-        // Show loading spinner
-        resultsContainer.innerHTML = `
-          <div class="loader-container">
-            <div class="spinner"></div>
-            <p style="font-weight: 600; color: var(--blue);">Thinking and searching web sources...</p>
+        // 1. Add user message to state
+        chatHistory.push({ role: 'user', parts: [{ text: promptText }] });
+        
+        // Keep only last 20 messages (10 Q&A pairs)
+        if (chatHistory.length > 20) {
+          chatHistory = chatHistory.slice(-20);
+        }
+
+        // 2. Render immediately
+        renderChatHistory();
+
+        // 3. Clear textarea input window
+        textInput.value = '';
+
+        // 4. Append inline thinking loader
+        resultsContainer.innerHTML += `
+          <div id="thinking-loader" style="margin-bottom: 1.25rem; text-align: left;">
+            <div style="font-weight: 700; color: var(--badge-live); margin-bottom: 0.25rem; font-size: 0.9rem;">🤖 Assistant:</div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0;">
+              <div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
+              <span style="font-size: 0.9rem; color: var(--muted); font-style: italic;">Thinking and searching web sources...</span>
+            </div>
           </div>
         `;
+        resultsContainer.scrollTop = resultsContainer.scrollHeight;
 
-        // POST request to the backend conversational chat endpoint
+        // 5. Post payload with conversation history
         fetch('https://psi-workflow-prices.onrender.com/api/portal-chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            prompt: promptText,
+            history: chatHistory,
             api_key: apiKey,
             model: 'gemini-2.5-flash'
           })
@@ -748,29 +814,49 @@
             throw new Error(data.error || 'Server error');
           }
 
-          // Convert simple markdown elements and links to HTML for clickability
-          let cleanedText = data.answer
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1 ↗</a>');
+          // Push model answer to state
+          chatHistory.push({ role: 'model', parts: [{ text: data.answer }] });
+          
+          // Re-slice to be safe
+          if (chatHistory.length > 20) {
+            chatHistory = chatHistory.slice(-20);
+          }
 
-          resultsContainer.innerHTML = `
-            <div style="padding: 1rem; line-height: 1.6; white-space: pre-wrap; font-size: 0.95rem; text-align: left;">
-              ${cleanedText}
-            </div>
-          `;
+          // Re-render
+          renderChatHistory();
         })
         .catch(err => {
-          resultsContainer.innerHTML = `
-            <div style="padding: 2.5rem; text-align: center; color: var(--red); font-weight: bold;">
+          // Remove the thinking loader
+          const loader = document.getElementById('thinking-loader');
+          if (loader) loader.remove();
+
+          // Render error notification in the chat
+          resultsContainer.innerHTML += `
+            <div style="padding: 1rem; text-align: center; color: var(--red); font-weight: bold; border: 1px solid var(--red); border-radius: 6px; margin-top: 0.5rem;">
               Error: ${err.message}
             </div>
           `;
+          resultsContainer.scrollTop = resultsContainer.scrollHeight;
+          
+          // Remove last user prompt from state to prevent invalid API states
+          chatHistory.pop();
         });
+      });
+
+      // Allow pressing Enter to submit (Shift+Enter for new lines)
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          searchBtn.click();
+        }
+      });
+    }
+
+    // Clear Chat History functionality
+    if (clearChatBtn) {
+      clearChatBtn.addEventListener('click', () => {
+        chatHistory = [];
+        renderChatHistory();
       });
     }
   </script>

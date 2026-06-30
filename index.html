@@ -532,10 +532,29 @@
           </div>
         </div>
 
+        <!-- Prompt Templates & Export Button -->
+        <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%; margin-bottom: 0.5rem; flex-wrap: wrap; padding: 0.25rem 0;">
+          <select id="prompt-template-select" style="flex: 1; min-width: 180px; padding: 0.35rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 0.85rem; cursor: pointer;">
+            <option value="">📋 Select a Quick-Action Prompt Template...</option>
+            <option value="analyze">📝 Analyze Compliance (Identify hidden deliverables / requirements)</option>
+            <option value="compare">⚖️ Compare RFQ to Proposal (Highlight gaps and compliance flags)</option>
+            <option value="draft">✍️ Draft Technical Response (Write compliant response text)</option>
+            <option value="summary">🔍 Summarize Scope of Work (Summarize key objectives and deadlines)</option>
+          </select>
+          <button id="export-chat-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" title="Export conversation log to markdown file">📤 Export Chat</button>
+        </div>
+
+        <!-- Attachment Pill List -->
+        <div id="attachments-container" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem;"></div>
+
         <div class="chat-input-area">
           <textarea id="text-input" class="chat-textarea" placeholder="Ask a general procurement or technical question..."></textarea>
-          <div class="chat-btn-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <button id="clear-chat-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.45rem 0.9rem; border-color: var(--border);">🗑️ Clear Chat</button>
+          <div class="chat-btn-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 0.5rem;">
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <button id="clear-chat-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.45rem 0.9rem; border-color: var(--border);">🗑️ Clear Chat</button>
+              <button id="attach-btn" class="btn-secondary" type="button" style="font-size: 0.8rem; padding: 0.45rem 0.9rem; border-color: var(--border);" title="Attach PDF, Word, CSV or Text files">📎 Attach File</button>
+              <input type="file" id="chat-file-input" multiple style="display: none;" accept=".pdf,.docx,.txt,.csv" />
+            </div>
             <button id="search-btn" class="btn-primary" type="button">💬 Ask Assistant</button>
           </div>
         </div>
@@ -686,16 +705,161 @@
     // ── Google AI Search Widget logic ──────────────────────────
     const searchBtn = document.getElementById('search-btn');
     const clearChatBtn = document.getElementById('clear-chat-btn');
+    const attachBtn = document.getElementById('attach-btn');
+    const chatFileInput = document.getElementById('chat-file-input');
+    const attachmentsContainer = document.getElementById('attachments-container');
+    const promptTemplateSelect = document.getElementById('prompt-template-select');
+    const exportChatBtn = document.getElementById('export-chat-btn');
     const textInput = document.getElementById('text-input');
     const portalApiKey = document.getElementById('portal-api-key');
     const resultsContainer = document.getElementById('results-container');
 
-    // Conversation history state (holds up to 20 items = 10 turns)
+    // Conversation history state & attached files state
     let chatHistory = [];
+    let attachedFiles = [];
 
     // Load stored key
     if (portalApiKey) {
       portalApiKey.value = localStorage.getItem('gemini_api_key') || '';
+    }
+
+    // Render attachments pill bar
+    function renderAttachments() {
+      if (!attachmentsContainer) return;
+      attachmentsContainer.innerHTML = '';
+      attachedFiles.forEach((file, idx) => {
+        const pill = document.createElement('div');
+        pill.style.cssText = 'background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 0.25rem 0.5rem; display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text); font-weight: 500;';
+        pill.innerHTML = `
+          <span>📄 ${file.name} (${Math.round(file.size / 1024)} KB)</span>
+          <span style="cursor: pointer; font-weight: bold; color: var(--red); font-size: 0.85rem;" onclick="removeAttachment(${idx})">✕</span>
+        `;
+        attachmentsContainer.appendChild(pill);
+      });
+    }
+
+    // Remove attachment (must be global window context)
+    window.removeAttachment = function(idx) {
+      attachedFiles.splice(idx, 1);
+      renderAttachments();
+    };
+
+    // File selection handler
+    if (attachBtn && chatFileInput) {
+      attachBtn.addEventListener('click', () => {
+        chatFileInput.click();
+      });
+
+      chatFileInput.addEventListener('change', () => {
+        const files = chatFileInput.files;
+        if (files.length === 0) return;
+
+        Array.from(files).forEach(file => {
+          // Limit upload size (e.g. 50MB safety limit per file)
+          if (file.size > 50 * 1024 * 1024) {
+            alert(`File "${file.name}" is too large. Max size is 50MB.`);
+            return;
+          }
+
+          // Create FormData and upload
+          const formData = new FormData();
+          formData.append('file', file);
+
+          // Add a temporary "Uploading..." loading pill
+          const loadingPill = document.createElement('div');
+          loadingPill.id = `pill-loading-${file.name.replace(/\s+/g, '-')}`;
+          loadingPill.style.cssText = 'background: var(--border); border: 1px dashed var(--muted); border-radius: 6px; padding: 0.25rem 0.5rem; display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; color: var(--text-muted); font-style: italic;';
+          loadingPill.innerHTML = `<span>⏳ Uploading ${file.name}...</span>`;
+          attachmentsContainer.appendChild(loadingPill);
+
+          fetch('https://psi-workflow-prices.onrender.com/api/portal-upload', {
+            method: 'POST',
+            body: formData
+          })
+          .then(res => {
+            if (!res.ok) {
+              return res.json().then(e => { throw new Error(e.error || 'Upload error'); });
+            }
+            return res.json();
+          })
+          .then(data => {
+            // Remove loading pill
+            const loading = document.getElementById(loadingPill.id);
+            if (loading) loading.remove();
+
+            if (data.success) {
+              attachedFiles.push({
+                name: data.filename,
+                text: data.text,
+                size: data.size_bytes
+              });
+              renderAttachments();
+            }
+          })
+          .catch(err => {
+            const loading = document.getElementById(loadingPill.id);
+            if (loading) loading.remove();
+            alert(`Failed to upload ${file.name}: ${err.message}`);
+          });
+        });
+
+        // Reset file input element so same file can be re-uploaded
+        chatFileInput.value = '';
+      });
+    }
+
+    // Prompt Template Select handler
+    if (promptTemplateSelect && textInput) {
+      promptTemplateSelect.addEventListener('change', () => {
+        const val = promptTemplateSelect.value;
+        if (!val) return;
+
+        let selectedPromptText = '';
+        if (val === 'analyze') {
+          selectedPromptText = 'Review the attached RFQ document. List all compliance requirements, deliverables, and hidden deadlines in a clean summary table.';
+        } else if (val === 'compare') {
+          selectedPromptText = 'Compare the attached RFQ document with the attached proposal document. Highlight any gaps, discrepancies, or potential compliance flags.';
+        } else if (val === 'draft') {
+          selectedPromptText = 'Based on the requirements in the attached RFQ document, draft a professional, compliant technical proposal response section for [Insert Section name, e.g. Section 3.2].';
+        } else if (val === 'summary') {
+          selectedPromptText = 'Provide a clear summary of the Scope of Work (SOW) outlined in the attached document, highlighting main objectives, key milestones, and critical constraints.';
+        }
+
+        textInput.value = selectedPromptText;
+        textInput.focus();
+
+        // Reset dropdown choice back to default
+        promptTemplateSelect.value = '';
+      });
+    }
+
+    // Export Chat History
+    if (exportChatBtn) {
+      exportChatBtn.addEventListener('click', () => {
+        if (chatHistory.length === 0) {
+          alert('Chat history is empty. Ask a few questions first to export.');
+          return;
+        }
+
+        let exportText = "# PSI AI Assistant - Conversation Log\n";
+        exportText += `Exported on: ${new Date().toLocaleString()}\n\n---\n\n`;
+
+        chatHistory.forEach(msg => {
+          const isUser = msg.role === 'user';
+          const sender = isUser ? '🧑 You' : '🤖 Assistant';
+          exportText += `### ${sender}\n${msg.parts[0].text}\n\n`;
+        });
+
+        const blob = new Blob([exportText], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `psi_chat_log_${Date.now()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
     }
 
     // Render the chat conversation
@@ -761,7 +925,7 @@
         // Save key
         localStorage.setItem('gemini_api_key', apiKey);
 
-        // 1. Add user message to state
+        // 1. Add user message to local history (tidy question)
         chatHistory.push({ role: 'user', parts: [{ text: promptText }] });
         
         // Keep only last 20 messages (10 Q&A pairs)
@@ -787,14 +951,24 @@
         `;
         resultsContainer.scrollTop = resultsContainer.scrollHeight;
 
-        // 5. Post payload with conversation history
+        // 5. Build apiHistory (where the last query has attached file context)
+        let apiHistory = JSON.parse(JSON.stringify(chatHistory));
+        if (apiHistory.length > 0 && attachedFiles.length > 0) {
+          let fileContext = '';
+          attachedFiles.forEach(file => {
+            fileContext += `\n[Attached File: ${file.name}]\n[CONTENT START]\n${file.text}\n[CONTENT END]\n`;
+          });
+          apiHistory[apiHistory.length - 1].parts[0].text = `${fileContext}\nInstructions/Question: ${promptText}`;
+        }
+
+        // 6. Post payload with conversation history
         fetch('https://psi-workflow-prices.onrender.com/api/portal-chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            history: chatHistory,
+            history: apiHistory,
             api_key: apiKey,
             model: 'gemini-2.5-flash'
           })
@@ -814,7 +988,7 @@
             throw new Error(data.error || 'Server error');
           }
 
-          // Push model answer to state
+          // Push model answer to local history
           chatHistory.push({ role: 'model', parts: [{ text: data.answer }] });
           
           // Re-slice to be safe
@@ -856,6 +1030,8 @@
     if (clearChatBtn) {
       clearChatBtn.addEventListener('click', () => {
         chatHistory = [];
+        attachedFiles = [];
+        renderAttachments();
         renderChatHistory();
       });
     }

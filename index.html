@@ -148,6 +148,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 1.25rem;
+      align-items: start;
     }
 
     /* ── Card ─────────────────────────────────────────────── */
@@ -337,10 +338,15 @@
     }
 
     .chat-body {
-      min-height: 80px;
+      height: 280px;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 0.5rem;
     }
 
     .chat-input-area {

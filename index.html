@@ -80,7 +80,7 @@
       margin-bottom: 0.85rem;
     }
 
-    .logo-wrap {
+    .brand-wrap {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -91,7 +91,7 @@
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
     }
 
-    .logo-image {
+    .brand-logo {
       width: clamp(55px, 9.5vw, 105px);
       height: auto;
       display: block;
@@ -510,8 +510,8 @@
   <header>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark mode">Light Mode</button>
     <div class="logo-row">
-      <div class="logo-wrap">
-        <img id="psi-logo" class="logo-image" src="assets/psi-logo.png" alt="Project Services International logo" />
+      <div class="brand-wrap">
+        <img id="brandLogo" class="brand-logo" src="assets/psi-logo.png" alt="Project Services International logo" />
         <div id="psi-logo-fallback" class="logo-fallback">🏢</div>
       </div>
     </div>
@@ -605,7 +605,7 @@
       });
     }
 
-    const logo = document.getElementById('psi-logo');
+    const logo = document.getElementById('brandLogo');
     const logoFallback = document.getElementById('psi-logo-fallback');
     if (logo) {
       logo.addEventListener('error', () => {
